@@ -15,7 +15,7 @@ const OFFSET_TEXT_X = 15;
 const OFFSET_BETWEEN_BARS = 2;
 const BAR_WIDTH = 20;
 
-const TICKS_PER_BAR = 3;
+const TICKS_PER_BAR = 5;
 const MULTIPLIER_UPDATE_INTERVAL_MS = 250;
 
 const PriceLines = ({ height }: { height: number }) => {
@@ -63,13 +63,16 @@ const PriceLines = ({ height }: { height: number }) => {
 interface MovingBarProps {
     startPrice: number;
     askForNextPrice: () => Promise<number>;
-    endPrice?: number;
+    width: number;
     height: number;
     barIndex: number;
+    endPrice?: number;
+    showCurrentPrice?: boolean;
 }
 
-const MovingBar: FC<MovingBarProps> = ({ startPrice, askForNextPrice, endPrice, height, barIndex }) => {
+const MovingBar: FC<MovingBarProps> = ({ startPrice, askForNextPrice, endPrice, width, height, barIndex, showCurrentPrice }) => {
     const currentPrice = useRef<number>(startPrice);
+    const startY = useRef<number>(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -90,7 +93,7 @@ const MovingBar: FC<MovingBarProps> = ({ startPrice, askForNextPrice, endPrice, 
             cancelled = true;
         }
     }, [endPrice]);
-
+    
     const drawBar = (g: Graphics) => {
         // NOTE(Nikita): Calculate the percentage difference between current and previous multiplier
         //               Minus sign used to reverse the direction of bar
@@ -102,18 +105,53 @@ const MovingBar: FC<MovingBarProps> = ({ startPrice, askForNextPrice, endPrice, 
         g.clear();
         g.setFillStyle({ color: priceDifference > 0 ? GREEN_BAR : RED_BAR });
         if(priceDifference > 0) {
-            const startY = OFFSET_TOP + height - currentPrice.current * SCALE_Y;
-            g.rect(startX, startY, BAR_WIDTH, barHeight);
+            startY.current = OFFSET_TOP + height - currentPrice.current * SCALE_Y;
+            g.rect(startX, startY.current, BAR_WIDTH, barHeight);
         }
         else {
-            const startY = OFFSET_TOP + height - startPrice * SCALE_Y;
-            g.rect(startX, startY, BAR_WIDTH, barHeight);
+            startY.current = OFFSET_TOP + height - startPrice * SCALE_Y;
+            g.rect(startX, startY.current, BAR_WIDTH, barHeight);
         }
         g.fill();
     };
 
     return (
         <pixiContainer>
+            <pixiContainer
+                x={0}
+                y={startY.current}
+            >
+                {
+                    showCurrentPrice && (currentPrice.current !== 0) && (
+                        <>
+                            <pixiContainer>
+                                <pixiHtmlText
+                                    x={width - OFFSET_TEXT_X - 100}
+                                    y={-20}
+                                    text={`${currentPrice.current.toFixed(4)}x`}
+                                    style={{
+                                        fontFamily: "Tahoma",
+                                        fontSize: 12,
+                                        fill: "#FFFFFF",
+                                        align: "center"
+                                    }}
+                                />
+                            </pixiContainer>
+                            <pixiGraphics
+                                x={0}
+                                y={0}
+                                draw={(g: Graphics) => {
+                                    g.clear();
+                                    g.setStrokeStyle({ color: "#FFAC0E", width: 2, alpha: 0.3 });
+                                    g.moveTo(OFFSET_CHART_X, 0);
+                                    g.lineTo(10000, 0);
+                                    g.stroke();
+                                }}
+                            />
+                        </>
+                    )
+                }
+            </pixiContainer>
             <pixiGraphics
                 x={0}
                 y={0}
@@ -185,6 +223,7 @@ export const ChartNobodyCanPredict: FC<ChartNobodyCanPredictProps> = ({ width, h
     const price = useRef<number>(1.0);
     const [, forceUpdate] = useReducer(x => x + 1, 0);
 
+    const definedWidth = useMemo(() => width || 800, [width]);
     const definedHeight = useMemo(() => height || 400, [height]);
 
     const askForNextPrice = async () => {
@@ -200,7 +239,7 @@ export const ChartNobodyCanPredict: FC<ChartNobodyCanPredictProps> = ({ width, h
 
         while(
             newPrice === price.current
-            || (endPrices.current.length > 0 && Math.abs(newPrice - endPrices.current[endPrices.current.length - 1]) < 0.05)
+            || (endPrices.current.length > 0 && Math.abs(newPrice - endPrices.current[endPrices.current.length - 1]) < 0.3)
             || newPrice > 10
         ) {
             newPrice = driftPrice(
@@ -248,6 +287,7 @@ export const ChartNobodyCanPredict: FC<ChartNobodyCanPredictProps> = ({ width, h
                         barIndex={index}
                         endPrice={fixedPrice}
                         height={definedHeight}
+                        width={definedWidth}
                     />
                 ))
             }
@@ -256,6 +296,8 @@ export const ChartNobodyCanPredict: FC<ChartNobodyCanPredictProps> = ({ width, h
                 askForNextPrice={askForNextPrice}
                 barIndex={endPrices.current.length}
                 height={definedHeight}
+                width={definedWidth}
+                showCurrentPrice
             />
         </Application>
     )
