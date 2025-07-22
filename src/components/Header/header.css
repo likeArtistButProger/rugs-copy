@@ -1,0 +1,21 @@
+.header {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.profile-card {
+    padding: 4px 12px;
+    display: flex;
+    background: black;
+    color: white;
+    font-weight: 700;
+    border-radius: 12px;
+}
+
+.username::after {
+    content: "|";
+    padding: 0 6px;
+    font-weight: 700;
+}
